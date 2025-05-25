@@ -11,7 +11,6 @@ const Engine = Matter.Engine,
 // Crear motor y mundo
 const engine = Engine.create();
 engine.gravity.y = 0;
-
 const world = engine.world;
 
 // Crear renderizador
@@ -22,7 +21,8 @@ const render = Render.create({
     width: window.innerWidth,
     height: window.innerHeight,
     background: '#f0f0f0',
-    wireframes: false
+    wireframes: false,
+    pixelRatio: window.devicePixelRatio
   }
 });
 
@@ -45,15 +45,14 @@ function createBubble(x, y, text, color) {
   return body;
 }
 
-// Dos burbujas visibles desde el principio
-let bubbles = [
-  createBubble(200, 200, "Hola", "#A0D6FF"),
-  createBubble(500, 400, "Adiós", "#FF8080")
-];
+// Crear las burbujas
+const bubble1 = createBubble(200, 200, "Hola", "#A0D6FF");
+const bubble2 = createBubble(500, 400, "Adiós", "#FF8080");
 
+const bubbles = [bubble1, bubble2];
 Composite.add(world, bubbles);
 
-// Mouse interacción
+// Hacerlas arrastrables
 const mouse = Mouse.create(render.canvas);
 const mouseConstraint = MouseConstraint.create(engine, {
   mouse: mouse,
@@ -64,7 +63,7 @@ const mouseConstraint = MouseConstraint.create(engine, {
 });
 Composite.add(world, mouseConstraint);
 
-// Verificación para reiniciar si salen de pantalla
+// Si se salen, vuelven a su posición original
 function checkOutOfBounds() {
   bubbles.forEach(bubble => {
     const pos = bubble.position;
@@ -80,15 +79,19 @@ function checkOutOfBounds() {
 }
 checkOutOfBounds();
 
-// Dibujar texto dentro de burbujas después del render
+// Asegurarnos de que se dibujen los textos de todas las burbujas
 Events.on(render, 'afterRender', function() {
   const ctx = render.context;
+  ctx.save();
   ctx.font = "bold 16px sans-serif";
   ctx.fillStyle = "#003366";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+
   bubbles.forEach(bubble => {
     const pos = bubble.position;
     ctx.fillText(bubble.label, pos.x, pos.y);
   });
+
+  ctx.restore();
 });
