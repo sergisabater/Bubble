@@ -5,8 +5,7 @@ const Engine = Matter.Engine,
       Bodies = Matter.Bodies,
       Composite = Matter.Composite,
       Mouse = Matter.Mouse,
-      MouseConstraint = Matter.MouseConstraint,
-      Events = Matter.Events;
+      MouseConstraint = Matter.MouseConstraint;
 
 // Crear motor y mundo
 const engine = Engine.create();
@@ -30,30 +29,30 @@ Render.run(render);
 const runner = Runner.create();
 Runner.run(runner, engine);
 
-// Crear burbujas con tamaño dinámico
-function createBubble(x, y, text) {
-  const radius = 60;
-  const body = Bodies.circle(x, y, radius, {
+// Crear burbuja con color personalizado
+function createBubble(x, y, text, color) {
+  const body = Bodies.circle(x, y, 60, {
     restitution: 0.9,
     render: {
-      fillStyle: '#A0D6FF',
-      strokeStyle: '#0095ff',
-      lineWidth: 3
+      fillStyle: color,
+      strokeStyle: '#000000',
+      lineWidth: 2
     },
-    label: text
+    label: text,
+    initialPosition: { x, y }
   });
-  body.radius = radius;
   return body;
 }
 
+// Dos burbujas visibles desde el principio
 let bubbles = [
-  createBubble(200, 200, "Hola"),
-  createBubble(500, 400, "Sokpop")
+  createBubble(200, 200, "Hola", "#A0D6FF"),
+  createBubble(500, 400, "Adiós", "#FF8080")
 ];
 
 Composite.add(world, bubbles);
 
-// Mouse interacciones
+// Mouse interacción
 const mouse = Mouse.create(render.canvas);
 const mouseConstraint = MouseConstraint.create(engine, {
   mouse: mouse,
@@ -64,54 +63,23 @@ const mouseConstraint = MouseConstraint.create(engine, {
 });
 Composite.add(world, mouseConstraint);
 
-// Bordes invisibles
-const borders = [
-  Bodies.rectangle(window.innerWidth / 2, -25, window.innerWidth, 50, { isStatic: true }),
-  Bodies.rectangle(window.innerWidth / 2, window.innerHeight + 25, window.innerWidth, 50, { isStatic: true }),
-  Bodies.rectangle(-25, window.innerHeight / 2, 50, window.innerHeight, { isStatic: true }),
-  Bodies.rectangle(window.innerWidth + 25, window.innerHeight / 2, 50, window.innerHeight, { isStatic: true })
-];
-Composite.add(world, borders);
-
-// Encogimiento y desaparición si están fuera de pantalla
-function updateBubbles() {
-  for (let i = 0; i < bubbles.length; i++) {
-    const b = bubbles[i];
-    const r = b.circleRadius;
-
+// Verificación para reiniciar si salen de pantalla
+function checkOutOfBounds() {
+  bubbles.forEach(bubble => {
+    const pos = bubble.position;
     if (
-      b.position.y < 20 || b.position.y > window.innerHeight - 20 ||
-      b.position.x < 20 || b.position.x > window.innerWidth - 20
+      pos.x < -100 || pos.x > window.innerWidth + 100 ||
+      pos.y < -100 || pos.y > window.innerHeight + 100
     ) {
-      // Encoger
-      const shrink = 0.98;
-      Matter.Body.scale(b, shrink, shrink);
-      b.circleRadius *= shrink;
-
-      if (b.circleRadius < 10) {
-        // Remover del mundo
-        Composite.remove(world, b);
-        // Crear nuevo en el centro
-        const newB = createBubble(
-          100 + Math.random() * (window.innerWidth - 200),
-          100 + Math.random() * (window.innerHeight - 200),
-          b.label
-        );
-        bubbles[i] = newB;
-        Composite.add(world, newB);
-      }
-    } else if (b.circleRadius < b.radius) {
-      // Si vuelve al centro, restaurar tamaño poco a poco
-      const grow = 1.02;
-      Matter.Body.scale(b, grow, grow);
-      b.circleRadius = Math.min(b.radius, b.circleRadius * grow);
+      Matter.Body.setPosition(bubble, bubble.initialPosition);
+      Matter.Body.setVelocity(bubble, { x: 0, y: 0 });
     }
-  }
-  requestAnimationFrame(updateBubbles);
+  });
+  requestAnimationFrame(checkOutOfBounds);
 }
-updateBubbles();
+checkOutOfBounds();
 
-// Renderizado del texto
+// Dibujar texto dentro de burbujas
 (function renderLabels() {
   const ctx = render.context;
   requestAnimationFrame(renderLabels);
