@@ -5,7 +5,8 @@ const Engine = Matter.Engine,
       Bodies = Matter.Bodies,
       Composite = Matter.Composite,
       Mouse = Matter.Mouse,
-      MouseConstraint = Matter.MouseConstraint;
+      MouseConstraint = Matter.MouseConstraint,
+      Events = Matter.Events;
 
 // Crear motor y mundo
 const engine = Engine.create();
@@ -79,10 +80,9 @@ function checkOutOfBounds() {
 }
 checkOutOfBounds();
 
-// Dibujar texto dentro de burbujas
-(function renderLabels() {
+// Dibujar texto dentro de burbujas después del render
+Events.on(render, 'afterRender', function() {
   const ctx = render.context;
-  requestAnimationFrame(renderLabels);
   ctx.font = "bold 16px sans-serif";
   ctx.fillStyle = "#003366";
   ctx.textAlign = "center";
@@ -91,4 +91,4 @@ checkOutOfBounds();
     const pos = bubble.position;
     ctx.fillText(bubble.label, pos.x, pos.y);
   });
-})();
+});
