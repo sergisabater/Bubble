@@ -1,133 +1,149 @@
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+const {
+  Engine,
+  Render,
+  Runner,
+  World,
+  Bodies,
+  Body,
+  Composite,
+  Events,
+  Mouse,
+  MouseConstraint
+} = Matter;
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+const engine = Engine.create();
+const world = engine.world;
 
-class Bubble {
-  constructor(x, y, radius, color, label) {
-    this.initialX = x;
-    this.initialY = y;
-    this.x = x;
-    this.y = y;
-    this.radius = radius;
-    this.color = color;
-    this.label = label;
-    this.vx = (Math.random() - 0.5) * 0.5;
-    this.vy = (Math.random() - 0.5) * 0.5;
-    this.dragging = false;
+const width = window.innerWidth;
+const height = window.innerHeight;
+
+const render = Render.create({
+  element: document.body,
+  engine: engine,
+  options: {
+    width: width,
+    height: height,
+    wireframes: false,
+    background: '#f0f8ff'
   }
+});
 
-  draw(ctx) {
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fillStyle = this.color;
-    ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-    ctx.closePath();
+Render.run(render);
+Runner.run(Runner.create(), engine);
 
-    ctx.fillStyle = '#003366';
-    ctx.font = 'bold 16px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(this.label, this.x, this.y);
-  }
-
-  update() {
-    if (!this.dragging) {
-      this.x += this.vx;
-      this.y += this.vy;
-
-      // Rebote en los bordes
-      if (this.x + this.radius > canvas.width || this.x - this.radius < 0) {
-        this.vx *= -1;
-      }
-      if (this.y + this.radius > canvas.height || this.y - this.radius < 0) {
-        this.vy *= -1;
-      }
-    }
-  }
-
-  isOutOfBounds() {
-    return (
-      this.x + this.radius < 0 ||
-      this.x - this.radius > canvas.width ||
-      this.y + this.radius < 0 ||
-      this.y - this.radius > canvas.height
-    );
-  }
-
-  resetPosition() {
-    this.x = this.initialX;
-    this.y = this.initialY;
-    this.vx = (Math.random() - 0.5) * 0.5;
-    this.vy = (Math.random() - 0.5) * 0.5;
-  }
-
-  isPointInside(px, py) {
-    const dx = px - this.x;
-    const dy = py - this.y;
-    return dx * dx + dy * dy <= this.radius * this.radius;
-  }
-}
-
-const bubbles = [
-  new Bubble(200, 200, 60, '#A0D6FF', 'Hola'),
-  new Bubble(500, 300, 60, '#FF8080', 'Adiós')
+// Paredes
+const walls = [
+  Bodies.rectangle(width / 2, 0, width, 40, { isStatic: true }),
+  Bodies.rectangle(width / 2, height, width, 40, { isStatic: true }),
+  Bodies.rectangle(0, height / 2, 40, height, { isStatic: true }),
+  Bodies.rectangle(width, height / 2, 40, height, { isStatic: true })
 ];
+World.add(world, walls);
 
-let draggingBubble = null;
-let offsetX = 0;
-let offsetY = 0;
-
-canvas.addEventListener('mousedown', (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const mouseX = e.clientX - rect.left;
-  const mouseY = e.clientY - rect.top;
-
-  for (let i = bubbles.length - 1; i >= 0; i--) {
-    if (bubbles[i].isPointInside(mouseX, mouseY)) {
-      draggingBubble = bubbles[i];
-      offsetX = mouseX - draggingBubble.x;
-      offsetY = mouseY - draggingBubble.y;
-      draggingBubble.dragging = true;
-      break;
+function createBubble(x, y, text, id) {
+  const radius = 60;
+  const body = Bodies.circle(x, y, radius, {
+    restitution: 0.9,
+    frictionAir: 0.01,
+    label: id,
+    render: {
+      fillStyle: '#add8e6',
+      strokeStyle: '#000',
+      lineWidth: 2
     }
-  }
-});
-
-canvas.addEventListener('mousemove', (e) => {
-  if (draggingBubble) {
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    draggingBubble.x = mouseX - offsetX;
-    draggingBubble.y = mouseY - offsetY;
-  }
-});
-
-canvas.addEventListener('mouseup', () => {
-  if (draggingBubble) {
-    draggingBubble.dragging = false;
-    draggingBubble = null;
-  }
-});
-
-function animate() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  for (let bubble of bubbles) {
-    bubble.update();
-    bubble.draw(ctx);
-
-    if (bubble.isOutOfBounds()) {
-      bubble.resetPosition();
-    }
-  }
-
-  requestAnimationFrame(animate);
+  });
+  body.originalRadius = radius;
+  body.bubbleText = text;
+  return body;
 }
 
-animate();
+const bubble1 = createBubble(200, 200, 'Hola', 'bubble1');
+const bubble2 = createBubble(600, 300, 'Adios', 'bubble2');
+World.add(world, [bubble1, bubble2]);
+
+Events.on(render, 'afterRender', () => {
+  const context = render.context;
+  context.font = '20px Arial';
+  context.fillStyle = '#000';
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillText(bubble1.bubbleText, bubble1.position.x, bubble1.position.y);
+  context.fillText(bubble2.bubbleText, bubble2.position.x, bubble2.position.y);
+});
+
+const mouse = Mouse.create(render.canvas);
+const mouseConstraint = MouseConstraint.create(engine, {
+  mouse,
+  constraint: {
+    stiffness: 0.2,
+    render: { visible: false }
+  }
+});
+World.add(world, mouseConstraint);
+
+// Limitar movimiento a los bordes
+Events.on(engine, 'beforeUpdate', () => {
+  [bubble1, bubble2].forEach(bubble => {
+    const radius = bubble.circleRadius;
+    if (bubble.position.x - radius < 0) {
+      Body.setPosition(bubble, { x: radius, y: bubble.position.y });
+      Body.setVelocity(bubble, { x: -bubble.velocity.x, y: bubble.velocity.y });
+    }
+    if (bubble.position.x + radius > width) {
+      Body.setPosition(bubble, { x: width - radius, y: bubble.position.y });
+      Body.setVelocity(bubble, { x: -bubble.velocity.x, y: bubble.velocity.y });
+    }
+    if (bubble.position.y - radius < 0) {
+      Body.setPosition(bubble, { x: bubble.position.x, y: radius });
+      Body.setVelocity(bubble, { x: bubble.velocity.x, y: -bubble.velocity.y });
+    }
+    if (bubble.position.y + radius > height) {
+      Body.setPosition(bubble, { x: bubble.position.x, y: height - radius });
+      Body.setVelocity(bubble, { x: bubble.velocity.x, y: -bubble.velocity.y });
+    }
+  });
+});
+
+// Reacciones a colisiones
+Events.on(engine, 'collisionStart', event => {
+  event.pairs.forEach(pair => {
+    const a = pair.bodyA;
+    const b = pair.bodyB;
+    if ((a.label === 'bubble1' && b.label === 'bubble2') ||
+        (a.label === 'bubble2' && b.label === 'bubble1')) {
+      a.shrinking = true;
+      b.shrinking = true;
+    }
+  });
+});
+
+Events.on(engine, 'collisionEnd', event => {
+  event.pairs.forEach(pair => {
+    const a = pair.bodyA;
+    const b = pair.bodyB;
+    if ((a.label === 'bubble1' && b.label === 'bubble2') ||
+        (a.label === 'bubble2' && b.label === 'bubble1')) {
+      a.shrinking = false;
+      b.shrinking = false;
+    }
+  });
+});
+
+// Animar tamaño
+Events.on(engine, 'beforeUpdate', () => {
+  [bubble1, bubble2].forEach(bubble => {
+    let scaleStep = 0.005;
+    if (bubble.shrinking) {
+      if (bubble.circleRadius > bubble.originalRadius * 0.6) {
+        let newRadius = bubble.circleRadius * (1 - scaleStep);
+        Body.scale(bubble, newRadius / bubble.circleRadius, newRadius / bubble.circleRadius);
+      }
+    } else {
+      if (bubble.circleRadius < bubble.originalRadius) {
+        let newRadius = bubble.circleRadius * (1 + scaleStep);
+        if (newRadius > bubble.originalRadius) newRadius = bubble.originalRadius;
+        Body.scale(bubble, newRadius / bubble.circleRadius, newRadius / bubble.circleRadius);
+      }
+    }
+  });
+});
