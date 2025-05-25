@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Burbujas con margen</title>
+  <title>Burbujas con rebotes controlados</title>
   <style>
     html, body {
       margin: 0; padding: 0; overflow: hidden; background: #f0f8ff;
@@ -16,7 +16,7 @@
 <body>
   <script src="https://cdn.jsdelivr.net/npm/matter-js@0.19.0/build/matter.min.js"></script>
   <script>
-    const { Engine, Render, Runner, World, Bodies, Body, Events, Mouse, MouseConstraint } = Matter;
+    const { Engine, Render, Runner, World, Bodies, Body, Events, Mouse, MouseConstraint, Vector } = Matter;
 
     const engine = Engine.create();
     const world = engine.world;
@@ -54,21 +54,22 @@
     Render.run(render);
     Runner.run(Runner.create(), engine);
 
-    // Creamos paredes virtuales fuera del area permitida para que reboten
+    // Paredes invisibles
     const wallThickness = 50;
     const walls = [
-      Bodies.rectangle(allowedArea.left - wallThickness / 2, height / 2, wallThickness, height, { isStatic: true }),
-      Bodies.rectangle(allowedArea.right + wallThickness / 2, height / 2, wallThickness, height, { isStatic: true }),
-      Bodies.rectangle(width / 2, allowedArea.top - wallThickness / 2, width, wallThickness, { isStatic: true }),
-      Bodies.rectangle(width / 2, allowedArea.bottom + wallThickness / 2, width, wallThickness, { isStatic: true }),
+      Bodies.rectangle(allowedArea.left - wallThickness / 2, height / 2, wallThickness, height, { isStatic: true, restitution: 0.1, friction: 0.5 }),
+      Bodies.rectangle(allowedArea.right + wallThickness / 2, height / 2, wallThickness, height, { isStatic: true, restitution: 0.1, friction: 0.5 }),
+      Bodies.rectangle(width / 2, allowedArea.top - wallThickness / 2, width, wallThickness, { isStatic: true, restitution: 0.1, friction: 0.5 }),
+      Bodies.rectangle(width / 2, allowedArea.bottom + wallThickness / 2, width, wallThickness, { isStatic: true, restitution: 0.1, friction: 0.5 }),
     ];
     World.add(world, walls);
 
     function createBubble(x, y, text, label) {
-      const radius = 150; // radio aumentado
+      const radius = 150;
       const body = Bodies.circle(x, y, radius, {
-        restitution: 0.9,
-        frictionAir: 0.01,
+        restitution: 0.2,        // menos rebote para amortiguar choque
+        frictionAir: 0.1,        // aire para frenado natural
+        friction: 0.2,
         label: label,
         render: {
           fillStyle: '#add8e6',
@@ -82,7 +83,6 @@
       return body;
     }
 
-    // Posiciones iniciales dentro del area permitida
     const bubble1 = createBubble(allowedArea.left + 200, allowedArea.top + 200, 'Hola', 'bubble1');
     const bubble2 = createBubble(allowedArea.right - 200, allowedArea.bottom - 200, 'Adios', 'bubble2');
     World.add(world, [bubble1, bubble2]);
@@ -116,6 +116,11 @@
         if ((bodyA === bubble1 && bodyB === bubble2) || (bodyA === bubble2 && bodyB === bubble1)) {
           bubble1.shrinking = true;
           bubble2.shrinking = true;
+
+          // Reducir velocidad drásticamente al chocar para simular amortiguación
+          [bodyA, bodyB].forEach(body => {
+            Body.setVelocity(body, Vector.mult(body.velocity, 0.3));
+          });
         }
       });
     });
@@ -130,8 +135,17 @@
       });
     });
 
+    const MAX_SPEED = 15; // límite de velocidad máxima
+
     Events.on(engine, 'beforeUpdate', () => {
       [bubble1, bubble2].forEach(bubble => {
+        // Limitar velocidad máxima
+        const speed = Math.sqrt(bubble.velocity.x ** 2 + bubble.velocity.y ** 2);
+        if (speed > MAX_SPEED) {
+          const limitedVelocity = Vector.mult(Vector.normalise(bubble.velocity), MAX_SPEED);
+          Body.setVelocity(bubble, limitedVelocity);
+        }
+
         // Encogimiento y recuperación
         let scaleStep = 0.005;
         if (bubble.shrinking) {
@@ -147,7 +161,7 @@
           }
         }
 
-        // Si la burbuja sale completamente fuera del área permitida, resetear posición
+        // Si sale fuera del área permitida, resetear posición
         const r = bubble.circleRadius;
         if (
           bubble.position.x + r < allowedArea.left ||
