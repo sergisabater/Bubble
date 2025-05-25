@@ -1,85 +1,133 @@
-const { Engine, Render, Runner, World, Bodies, Mouse, MouseConstraint, Events } = Matter;
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
 
-// Crear motor y mundo
-const engine = Engine.create();
-engine.gravity.y = 0;
-const world = engine.world;
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-// Crear render
-const render = Render.create({
-  element: document.body,
-  engine: engine,
-  options: {
-    width: window.innerWidth,
-    height: window.innerHeight,
-    background: '#f0f0f0',
-    wireframes: false
+class Bubble {
+  constructor(x, y, radius, color, label) {
+    this.initialX = x;
+    this.initialY = y;
+    this.x = x;
+    this.y = y;
+    this.radius = radius;
+    this.color = color;
+    this.label = label;
+    this.vx = (Math.random() - 0.5) * 0.5;
+    this.vy = (Math.random() - 0.5) * 0.5;
+    this.dragging = false;
   }
-});
 
-Render.run(render);
-Runner.run(Runner.create(), engine);
+  draw(ctx) {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.closePath();
 
-// Crear burbujas
-function createBubble(x, y, color, label) {
-  const bubble = Bodies.circle(x, y, 60, {
-    restitution: 0.9,
-    render: {
-      fillStyle: color,
-      strokeStyle: '#000000',
-      lineWidth: 2
-    },
-    label: label,
-    initialPosition: { x, y }
-  });
-  return bubble;
-}
-
-const bubble1 = createBubble(200, 200, "#A0D6FF", "Hola");
-const bubble2 = createBubble(500, 300, "#FF8080", "Adiós");
-
-const bubbles = [bubble1, bubble2];
-World.add(world, bubbles);
-
-// Agregar control de mouse
-const mouse = Mouse.create(render.canvas);
-const mouseConstraint = MouseConstraint.create(engine, {
-  mouse: mouse,
-  constraint: {
-    stiffness: 0.2,
-    render: { visible: false }
+    ctx.fillStyle = '#003366';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(this.label, this.x, this.y);
   }
-});
-World.add(world, mouseConstraint);
 
-// Redibujar textos después del render
-Events.on(render, 'afterRender', function () {
-  const ctx = render.context;
-  ctx.font = "bold 16px sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = "#003366";
+  update() {
+    if (!this.dragging) {
+      this.x += this.vx;
+      this.y += this.vy;
 
-  bubbles.forEach(bubble => {
-    ctx.fillText(bubble.label, bubble.position.x, bubble.position.y);
-  });
-});
-
-// Volver a la posición inicial si salen de pantalla
-function checkBounds() {
-  bubbles.forEach(bubble => {
-    const { x, y } = bubble.position;
-    const margin = 100;
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-
-    if (x < -margin || x > width + margin || y < -margin || y > height + margin) {
-      Matter.Body.setPosition(bubble, bubble.initialPosition);
-      Matter.Body.setVelocity(bubble, { x: 0, y: 0 });
+      // Rebote en los bordes
+      if (this.x + this.radius > canvas.width || this.x - this.radius < 0) {
+        this.vx *= -1;
+      }
+      if (this.y + this.radius > canvas.height || this.y - this.radius < 0) {
+        this.vy *= -1;
+      }
     }
-  });
+  }
 
-  requestAnimationFrame(checkBounds);
+  isOutOfBounds() {
+    return (
+      this.x + this.radius < 0 ||
+      this.x - this.radius > canvas.width ||
+      this.y + this.radius < 0 ||
+      this.y - this.radius > canvas.height
+    );
+  }
+
+  resetPosition() {
+    this.x = this.initialX;
+    this.y = this.initialY;
+    this.vx = (Math.random() - 0.5) * 0.5;
+    this.vy = (Math.random() - 0.5) * 0.5;
+  }
+
+  isPointInside(px, py) {
+    const dx = px - this.x;
+    const dy = py - this.y;
+    return dx * dx + dy * dy <= this.radius * this.radius;
+  }
 }
 
-checkBounds();
+const bubbles = [
+  new Bubble(200, 200, 60, '#A0D6FF', 'Hola'),
+  new Bubble(500, 300, 60, '#FF8080', 'Adiós')
+];
+
+let draggingBubble = null;
+let offsetX = 0;
+let offsetY = 0;
+
+canvas.addEventListener('mousedown', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    if (bubbles[i].isPointInside(mouseX, mouseY)) {
+      draggingBubble = bubbles[i];
+      offsetX = mouseX - draggingBubble.x;
+      offsetY = mouseY - draggingBubble.y;
+      draggingBubble.dragging = true;
+      break;
+    }
+  }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (draggingBubble) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    draggingBubble.x = mouseX - offsetX;
+    draggingBubble.y = mouseY - offsetY;
+  }
+});
+
+canvas.addEventListener('mouseup', () => {
+  if (draggingBubble) {
+    draggingBubble.dragging = false;
+    draggingBubble = null;
+  }
+});
+
+function animate() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  for (let bubble of bubbles) {
+    bubble.update();
+    bubble.draw(ctx);
+
+    if (bubble.isOutOfBounds()) {
+      bubble.resetPosition();
+    }
+  }
+
+  requestAnimationFrame(animate);
+}
+
+animate();
