@@ -1,14 +1,11 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Burbujas con Matter.js</title>
+  <meta charset="UTF-8" />
+  <title>Burbujas con margen</title>
   <style>
     html, body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: #f0f8ff;
+      margin: 0; padding: 0; overflow: hidden; background: #f0f8ff;
     }
     canvas {
       display: block;
@@ -23,9 +20,25 @@
 
     const engine = Engine.create();
     const world = engine.world;
+    engine.gravity.y = 0; // sin gravedad
 
     const width = window.innerWidth;
     const height = window.innerHeight;
+
+    // Márgenes
+    const marginTop = 150;
+    const marginBottom = 150;
+    const marginLeft = 80;
+    const marginRight = 80;
+
+    const allowedArea = {
+      left: marginLeft,
+      right: width - marginRight,
+      top: marginTop,
+      bottom: height - marginBottom,
+      width: width - marginLeft - marginRight,
+      height: height - marginTop - marginBottom,
+    };
 
     const render = Render.create({
       element: document.body,
@@ -41,19 +54,18 @@
     Render.run(render);
     Runner.run(Runner.create(), engine);
 
-    // Paredes
+    // Creamos paredes virtuales fuera del area permitida para que reboten
     const wallThickness = 50;
     const walls = [
-      Bodies.rectangle(width / 2, -wallThickness / 2, width, wallThickness, { isStatic: true }),
-      Bodies.rectangle(width / 2, height + wallThickness / 2, width, wallThickness, { isStatic: true }),
-      Bodies.rectangle(-wallThickness / 2, height / 2, wallThickness, height, { isStatic: true }),
-      Bodies.rectangle(width + wallThickness / 2, height / 2, wallThickness, height, { isStatic: true })
+      Bodies.rectangle(allowedArea.left - wallThickness / 2, height / 2, wallThickness, height, { isStatic: true }),
+      Bodies.rectangle(allowedArea.right + wallThickness / 2, height / 2, wallThickness, height, { isStatic: true }),
+      Bodies.rectangle(width / 2, allowedArea.top - wallThickness / 2, width, wallThickness, { isStatic: true }),
+      Bodies.rectangle(width / 2, allowedArea.bottom + wallThickness / 2, width, wallThickness, { isStatic: true }),
     ];
     World.add(world, walls);
 
-    // Crear burbuja
     function createBubble(x, y, text, label) {
-      const radius = 60;
+      const radius = 150; // radio aumentado
       const body = Bodies.circle(x, y, radius, {
         restitution: 0.9,
         frictionAir: 0.01,
@@ -65,31 +77,30 @@
         }
       });
       body.originalRadius = radius;
+      body.originalPosition = { x, y };
       body.bubbleText = text;
       return body;
     }
 
-    const bubble1 = createBubble(100, 100, 'Hola', 'bubble1');
-    const bubble2 = createBubble(300, 300, 'Adios', 'bubble2');
+    // Posiciones iniciales dentro del area permitida
+    const bubble1 = createBubble(allowedArea.left + 200, allowedArea.top + 200, 'Hola', 'bubble1');
+    const bubble2 = createBubble(allowedArea.right - 200, allowedArea.bottom - 200, 'Adios', 'bubble2');
     World.add(world, [bubble1, bubble2]);
 
-    // Mouse
     const mouse = Mouse.create(render.canvas);
     const mouseConstraint = MouseConstraint.create(engine, {
-      mouse: mouse,
+      mouse,
       constraint: {
         stiffness: 0.2,
         render: { visible: false }
       }
     });
     World.add(world, mouseConstraint);
-
     render.mouse = mouse;
 
-    // Dibujar texto sobre las burbujas
     Events.on(render, 'afterRender', () => {
       const ctx = render.context;
-      ctx.font = '20px Arial';
+      ctx.font = '28px Arial';
       ctx.fillStyle = '#000';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -99,7 +110,6 @@
       });
     });
 
-    // Reacción al contacto
     Events.on(engine, 'collisionStart', event => {
       event.pairs.forEach(pair => {
         const { bodyA, bodyB } = pair;
@@ -120,9 +130,9 @@
       });
     });
 
-    // Animar tamaño
     Events.on(engine, 'beforeUpdate', () => {
       [bubble1, bubble2].forEach(bubble => {
+        // Encogimiento y recuperación
         let scaleStep = 0.005;
         if (bubble.shrinking) {
           if (bubble.circleRadius > bubble.originalRadius * 0.6) {
@@ -135,6 +145,18 @@
             if (newRadius > bubble.originalRadius) newRadius = bubble.originalRadius;
             Body.scale(bubble, newRadius / bubble.circleRadius, newRadius / bubble.circleRadius);
           }
+        }
+
+        // Si la burbuja sale completamente fuera del área permitida, resetear posición
+        const r = bubble.circleRadius;
+        if (
+          bubble.position.x + r < allowedArea.left ||
+          bubble.position.x - r > allowedArea.right ||
+          bubble.position.y + r < allowedArea.top ||
+          bubble.position.y - r > allowedArea.bottom
+        ) {
+          Body.setPosition(bubble, { ...bubble.originalPosition });
+          Body.setVelocity(bubble, { x: 0, y: 0 });
         }
       });
     });
