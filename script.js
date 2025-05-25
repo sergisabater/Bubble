@@ -1,19 +1,11 @@
-// Alias útiles
-const Engine = Matter.Engine,
-      Render = Matter.Render,
-      Runner = Matter.Runner,
-      Bodies = Matter.Bodies,
-      Composite = Matter.Composite,
-      Mouse = Matter.Mouse,
-      MouseConstraint = Matter.MouseConstraint,
-      Events = Matter.Events;
+const { Engine, Render, Runner, World, Bodies, Mouse, MouseConstraint, Events } = Matter;
 
 // Crear motor y mundo
 const engine = Engine.create();
 engine.gravity.y = 0;
 const world = engine.world;
 
-// Crear renderizador
+// Crear render
 const render = Render.create({
   element: document.body,
   engine: engine,
@@ -21,38 +13,35 @@ const render = Render.create({
     width: window.innerWidth,
     height: window.innerHeight,
     background: '#f0f0f0',
-    wireframes: false,
-    pixelRatio: window.devicePixelRatio
+    wireframes: false
   }
 });
 
 Render.run(render);
-const runner = Runner.create();
-Runner.run(runner, engine);
+Runner.run(Runner.create(), engine);
 
-// Crear burbuja con color personalizado
-function createBubble(x, y, text, color) {
-  const body = Bodies.circle(x, y, 60, {
+// Crear burbujas
+function createBubble(x, y, color, label) {
+  const bubble = Bodies.circle(x, y, 60, {
     restitution: 0.9,
     render: {
       fillStyle: color,
       strokeStyle: '#000000',
       lineWidth: 2
     },
-    label: text,
+    label: label,
     initialPosition: { x, y }
   });
-  return body;
+  return bubble;
 }
 
-// Crear las burbujas
-const bubble1 = createBubble(200, 200, "Hola", "#A0D6FF");
-const bubble2 = createBubble(500, 400, "Adiós", "#FF8080");
+const bubble1 = createBubble(200, 200, "#A0D6FF", "Hola");
+const bubble2 = createBubble(500, 300, "#FF8080", "Adiós");
 
 const bubbles = [bubble1, bubble2];
-Composite.add(world, bubbles);
+World.add(world, bubbles);
 
-// Hacerlas arrastrables
+// Agregar control de mouse
 const mouse = Mouse.create(render.canvas);
 const mouseConstraint = MouseConstraint.create(engine, {
   mouse: mouse,
@@ -61,37 +50,36 @@ const mouseConstraint = MouseConstraint.create(engine, {
     render: { visible: false }
   }
 });
-Composite.add(world, mouseConstraint);
+World.add(world, mouseConstraint);
 
-// Si se salen, vuelven a su posición original
-function checkOutOfBounds() {
+// Redibujar textos después del render
+Events.on(render, 'afterRender', function () {
+  const ctx = render.context;
+  ctx.font = "bold 16px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#003366";
+
   bubbles.forEach(bubble => {
-    const pos = bubble.position;
-    if (
-      pos.x < -100 || pos.x > window.innerWidth + 100 ||
-      pos.y < -100 || pos.y > window.innerHeight + 100
-    ) {
+    ctx.fillText(bubble.label, bubble.position.x, bubble.position.y);
+  });
+});
+
+// Volver a la posición inicial si salen de pantalla
+function checkBounds() {
+  bubbles.forEach(bubble => {
+    const { x, y } = bubble.position;
+    const margin = 100;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    if (x < -margin || x > width + margin || y < -margin || y > height + margin) {
       Matter.Body.setPosition(bubble, bubble.initialPosition);
       Matter.Body.setVelocity(bubble, { x: 0, y: 0 });
     }
   });
-  requestAnimationFrame(checkOutOfBounds);
+
+  requestAnimationFrame(checkBounds);
 }
-checkOutOfBounds();
 
-// Asegurarnos de que se dibujen los textos de todas las burbujas
-Events.on(render, 'afterRender', function() {
-  const ctx = render.context;
-  ctx.save();
-  ctx.font = "bold 16px sans-serif";
-  ctx.fillStyle = "#003366";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-
-  bubbles.forEach(bubble => {
-    const pos = bubble.position;
-    ctx.fillText(bubble.label, pos.x, pos.y);
-  });
-
-  ctx.restore();
-});
+checkBounds();
