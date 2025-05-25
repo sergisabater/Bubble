@@ -31,7 +31,7 @@ Runner.run(runner, engine);
 
 // 🟣 Crear burbujas
 function createBubble(x, y, text) {
-  const bubble = Bodies.circle(x, y, 60, {
+  return Bodies.circle(x, y, 60, {
     restitution: 0.9,
     render: {
       fillStyle: '#A0D6FF',
@@ -40,13 +40,14 @@ function createBubble(x, y, text) {
     },
     label: text
   });
-  return bubble;
 }
 
-const bubble1 = createBubble(300, 300, "Hola");
-const bubble2 = createBubble(600, 200, "Sokpop");
+const bubbles = [
+  createBubble(300, 300, "Hola"),
+  createBubble(600, 200, "Sokpop")
+];
 
-Composite.add(world, [bubble1, bubble2]);
+Composite.add(world, bubbles);
 
 // 💻 Mouse para mover burbujas
 const mouse = Mouse.create(render.canvas);
@@ -76,7 +77,7 @@ Composite.add(world, borders);
   ctx.fillStyle = "#003366";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  [bubble1, bubble2].forEach(bubble => {
+  bubbles.forEach(bubble => {
     const pos = bubble.position;
     ctx.fillText(bubble.label, pos.x, pos.y);
   });
